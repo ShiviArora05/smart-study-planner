@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smart Study Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg1:#0f172a; --bg2:#0b1020; --glass: rgba(255,255,255,0.06);
+      --accent:#7c5cff; --accent-2:#34d399; --muted:rgba(255,255,255,0.65);
+      --glass-2: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;}
+    body{
+      margin:0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      background: radial-gradient(1200px 600px at 10% 10%, rgba(124,92,255,0.12), transparent),
+                  radial-gradient(1000px 500px at 90% 90%, rgba(52,211,153,0.06), transparent),
+                  linear-gradient(180deg,var(--bg1),var(--bg2));
+      color: #e6eef8; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      padding:32px;
+      overflow-y:auto;
+    }
+
+    /* floating shapes */
+    .float-shapes{position:fixed; inset:0; pointer-events:none;}
+    .blob{position:absolute; filter:blur(40px); opacity:0.55; transform:translate3d(0,0,0);}
+    .b1{width:420px;height:420px;background:linear-gradient(135deg,var(--accent),#3b82f6); border-radius:50%; left:-120px; top:-80px}
+    .b2{width:320px;height:320px;background:linear-gradient(135deg,var(--accent-2),#06b6d4); right:-100px; bottom:-80px}
+
+    /* main layout */
+    .app{
+      max-width:1100px; margin:0 auto; display:grid; grid-template-columns: 1fr 380px; gap:20px; align-items:start;
+    }
+
+    header{grid-column:1/-1; display:flex; gap:16px; align-items:center; justify-content:space-between; margin-bottom:8px}
+    .brand{display:flex; gap:12px; align-items:center}
+    .logo{font-family:'Space Grotesk'; font-weight:700; font-size:20px; letter-spacing:1px}
+    .tag{font-size:13px; color:var(--muted)}
+
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid var(--glass-2); padding:18px; border-radius:14px; box-shadow: 0 6px 20px rgba(2,6,23,0.6)}
+
+    /* left column */
+    .left{min-height:520px}
+    .form-row{display:flex; gap:10px; margin-bottom:10px}
+    input[type=text], input[type=date], input[type=time], select, textarea{background:transparent; border:1px solid rgba(255,255,255,0.06); color:inherit; padding:10px 12px; border-radius:8px; outline:none; width:100%;}
+    textarea{min-height:70px; resize:none}
+
+    .btn{background:linear-gradient(90deg,var(--accent),#4f46e5); border:none; padding:10px 14px; border-radius:10px; color:white; cursor:pointer; font-weight:600}
+    .btn.ghost{background:transparent; border:1px solid rgba(255,255,255,0.04)}
+
+    /* tasks list */
+    .tasks{margin-top:12px; display:grid; gap:10px}
+    .task{display:flex; align-items:flex-start; gap:12px; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.03); background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent)}
+    .task .leftcol{flex:1}
+    .task h4{margin:0 0 6px 0; font-size:15px}
+    .meta{font-size:12px; color:var(--muted)}
+    .tag-pill{font-size:12px; padding:6px 8px; border-radius:999px; background:rgba(255,255,255,0.04)}
+
+    .task-actions{display:flex; gap:8px; align-items:center}
+    .icon-btn{background:transparent; border:1px solid rgba(255,255,255,0.03); padding:8px; border-radius:8px; cursor:pointer}
+
+    /* right column */
+    .right{position:relative}
+    .progress-wrap{display:flex; gap:12px; align-items:center}
+    .progress{height:14px; background:rgba(255,255,255,0.04); border-radius:999px; flex:1; overflow:hidden}
+    .progress > i{display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); width:0%; transition:width 600ms cubic-bezier(.2,.9,.2,1)}
+    .small{font-size:13px; color:var(--muted)}
+
+    .calendar{margin-top:14px}
+    .date-select{display:flex; gap:8px; align-items:center}
+
+    footer{grid-column:1/-1; margin-top:18px; text-align:center; color:var(--muted); font-size:13px}
+
+    /* animations */
+    .fade-up{animation:fadeUp .6s ease both}
+    @keyframes fadeUp{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+    /* responsive */
+    @media (max-width:960px){
+      .app{grid-template-columns:1fr;}
+      .right{order: -1}
+    }
+  </style>
+</head>
+<body>
+  <div class="float-shapes" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+  </div>
+
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="logo">Shivi's Planner</div>
+        <div class="tag">Smart Study Planner • LocalStorage • No backend</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button id="exportBtn" class="btn ghost">Export JSON</button>
+        <input id="importFile" type="file" accept="application/json" style="display:none" />
+        <button id="importBtn" class="btn">Import</button>
+      </div>
+    </header>
+
+    <section class="left">
+      <div class="card">
+        <h3 style="margin:0 0 8px 0">Add a Task</h3>
+        <div class="small">Create study tasks — add time, date and subject. Tasks save locally.</div>
+        <div style="height:12px"></div>
+        <div class="form-row">
+          <input id="title" type="text" placeholder="Task title (eg: Read Ch.4 - Algorithms)" />
+        </div>
+        <div class="form-row">
+          <input id="date" type="date" />
+          <input id="time" type="time" />
+        </div>
+        <div class="form-row">
+          <select id="subject">
+            <option value="General">General</option>
+            <option value="Math">Math</option>
+            <option value="CS">Computer Science</option>
+            <option value="Physics">Physics</option>
+            <option value="Chemistry">Chemistry</option>
+          </select>
+          <select id="priority">
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <textarea id="notes" placeholder="Notes... (optional)"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="addBtn" class="btn">Add Task</button>
+          <button id="clearBtn" class="btn ghost">Clear All</button>
+          <div style="flex:1"></div>
+          <div class="small">Notifications: <span id="notifStatus">Not requested</span></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3 style="margin:0">Tasks</h3>
+          <div class="small">Showing <span id="taskCount">0</span> tasks</div>
+        </div>
+        <div class="tasks" id="tasks"></div>
+      </div>
+    </section>
+
+    <aside class="right">
+      <div class="card">
+        <h3 style="margin:0 0 8px 0">Overview</h3>
+        <div class="progress-wrap">
+          <div style="flex:1">
+            <div class="small">Overall Progress</div>
+            <div class="progress" style="margin-top:8px"><i id="progressFiller" style="width:0%"></i></div>
+          </div>
+          <div style="width:64px; text-align:center">
+            <div id="progressPct" style="font-weight:700; font-size:18px">0%</div>
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="calendar">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="small">Select date</div>
+              <div class="date-select">
+                <input id="filterDate" type="date" />
+                <button id="todayBtn" class="btn ghost">Today</button>
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div class="small">Upcoming</div>
+              <div id="upcomingCount" style="font-weight:600">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="pomodoroBtn" class="btn ghost">Start Pomodoro</button>
+          <button id="clearCompleted" class="btn ghost">Clear Completed</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px; text-align:center">
+        <div style="font-size:13px; color:var(--muted)">Tips</div>
+        <div style="margin-top:8px; font-weight:600">Use short focused sessions — try Pomodoro.</div>
+        <div style="margin-top:8px; font-size:12px; color:var(--muted)">Tasks persist in your browser.</div>
+      </div>
+    </aside>
+
+    <footer>Built with ❤️ • Save / export your data before clearing. </footer>
+  </div>
+
+  <script>
+    /* ---------------------------- Data model & helpers --------------------------- */
+    const STORAGE_KEY = 'smart-planner-tasks-v1'
+    let tasks = []
+
+    const $ = id => document.getElementById(id)
+
+    function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7) }
+
+    function load(){
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY)
+        tasks = raw ? JSON.parse(raw) : []
+      } catch(e){ tasks = [] }
+    }
+    function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)) }
+
+    /* ---------------------------- render functions --------------------------- */
+    function renderTasks(filterDate=null){
+      const container = $('tasks')
+      container.innerHTML = ''
+      let show = tasks
+      if(filterDate){ show = tasks.filter(t => t.date === filterDate) }
+      show.sort((a,b)=> (a.date||'') === (b.date||'') ? a.priority.localeCompare(b.priority) : (a.date||'').localeCompare(b.date||''))
+
+      $('taskCount').textContent = show.length
+
+      for(const t of show){
+        const div = document.createElement('div')
+        div.className = 'task fade-up'
+        div.innerHTML = `
+          <div class="leftcol">
+            <div style="display:flex;gap:10px;align-items:center">
+              <input type="checkbox" ${t.done? 'checked' : ''} data-id="${t.id}" class="doneChk" />
+              <div style="flex:1">
+                <h4 style="text-decoration:${t.done?'line-through':'none'}">${escapeHtml(t.title||'Untitled')}</h4>
+                <div class="meta">${t.date? formatDate(t.date) : 'No date'} • ${t.time || '--:--'} • <span class="tag-pill">${t.subject}</span> • ${t.priority}</div>
+              </div>
+            </div>
+            ${t.notes? `<div style="margin-top:8px; color:var(--muted); font-size:13px">${escapeHtml(t.notes)}</div>` : ''}
+          </div>
+          <div class="task-actions">
+            <button class="icon-btn" data-edit="${t.id}" title="Edit">✏️</button>
+            <button class="icon-btn" data-del="${t.id}" title="Delete">🗑️</button>
+          </div>
+        `
+        container.appendChild(div)
+      }
+
+      updateOverview()
+    }
+
+    function updateOverview(){
+      const total = tasks.length
+      const done = tasks.filter(t=>t.done).length
+      const pct = total? Math.round(done/total*100) : 0
+      $('progressFiller').style.width = pct + '%'
+      $('progressPct').textContent = pct + '%'
+      const upcoming = tasks.filter(t=> {
+        if(!t.date) return false
+        const d = new Date(t.date + 'T' + (t.time || '00:00'))
+        return d > new Date()
+      }).length
+      $('upcomingCount').textContent = upcoming
+    }
+
+    /* ---------------------------- utilities --------------------------- */
+    function formatDate(d){
+      try{ const dt = new Date(d); return dt.toLocaleDateString(); } catch(e){ return d }
+    }
+    function escapeHtml(s){ return (s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;') }
+
+    /* ---------------------------- events --------------------------- */
+    function init(){
+      load()
+      renderTasks()
+      $('filterDate').value = ''
+
+      // fill forms
+      $('addBtn').addEventListener('click', addTask)
+      $('clearBtn').addEventListener('click', ()=>{
+        if(confirm('Clear all tasks? This cannot be undone.')){ tasks=[]; save(); renderTasks(); }
+      })
+
+      $('tasks').addEventListener('click', e=>{
+        const id = e.target.dataset.id || e.target.closest('[data-id]')?.dataset?.id
+        if(e.target.matches('.doneChk') || e.target.closest('.doneChk')){
+          const cb = e.target.matches('.doneChk')? e.target : e.target.closest('.doneChk')
+          toggleDone(cb.dataset.id, cb.checked)
+        }
+        if(e.target.dataset.del){ delTask(e.target.dataset.del) }
+        if(e.target.dataset.edit){ openEdit(e.target.dataset.edit) }
+      })
+
+      $('filterDate').addEventListener('change', ()=>{
+        const v = $('filterDate').value
+        renderTasks(v || null)
+      })
+      $('todayBtn').addEventListener('click', ()=>{ $('filterDate').value = (new Date()).toISOString().slice(0,10); renderTasks($('filterDate').value) })
+
+      $('exportBtn').addEventListener('click', exportJSON)
+      $('importBtn').addEventListener('click', ()=>$('importFile').click())
+      $('importFile').addEventListener('change', handleImport)
+
+      $('clearCompleted').addEventListener('click', ()=>{
+        if(confirm('Remove all completed tasks?')){ tasks = tasks.filter(t=>!t.done); save(); renderTasks(); }
+      })
+
+      $('pomodoroBtn').addEventListener('click', startPomodoro)
+
+      // request notification permission when app starts (optional)
+      if('Notification' in window){
+        Notification.permission === 'granted' ? $('notifStatus').textContent = 'Granted' : $('notifStatus').textContent = 'Not granted'
+      }
+
+      // schedule any upcoming reminders for tasks that have notifications enabled
+      scheduleAllReminders()
+    }
+
+    function addTask(){
+      const title = $('title').value.trim()
+      if(!title){ alert('Enter a task title'); return }
+      const t = { id: uid(), title, date: $('date').value || null, time: $('time').value || null, subject: $('subject').value, priority: $('priority').value, notes: $('notes').value.trim(), done:false }
+      tasks.push(t)
+      save()
+      renderTasks($('filterDate').value || null)
+      scheduleReminderForTask(t)
+      // clear inputs
+      $('title').value=''; $('notes').value=''; $('time').value=''; $('date').value=''
+    }
+
+    function delTask(id){
+      if(!confirm('Delete this task?')) return
+      tasks = tasks.filter(t=>t.id!==id)
+      save(); renderTasks($('filterDate').value || null)
+    }
+
+    function toggleDone(id, val){
+      const t = tasks.find(x=>x.id===id)
+      if(!t) return
+      t.done = !!val
+      save(); renderTasks($('filterDate').value || null)
+    }
+
+    function openEdit(id){
+      const t = tasks.find(x=>x.id===id)
+      if(!t) return
+      const newTitle = prompt('Edit title', t.title)
+      if(newTitle === null) return
+      t.title = newTitle
+      save(); renderTasks($('filterDate').value || null)
+    }
+
+    /* ---------------------------- import/export --------------------------- */
+    function exportJSON(){
+      const blob = new Blob([JSON.stringify(tasks, null, 2)], {type:'application/json'})
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = 'smart-planner-tasks.json'; a.click(); URL.revokeObjectURL(url)
+    }
+    function handleImport(e){
+      const f = e.target.files[0]
+      if(!f) return
+      const reader = new FileReader()
+      reader.onload = ()=>{
+        try{
+          const pt = JSON.parse(reader.result)
+          if(!Array.isArray(pt)) throw new Error('Invalid format')
+          tasks = pt.map(x=> ({...x, id: x.id || uid()}))
+          save(); renderTasks($('filterDate').value || null)
+          alert('Imported tasks')
+        }catch(err){ alert('Invalid file') }
+      }
+      reader.readAsText(f)
+    }
+
+    /* ---------------------------- Pomodoro (simple) --------------------------- */
+    let pomoTimer = null
+    function startPomodoro(){
+      if(pomoTimer){ clearInterval(pomoTimer); pomoTimer=null; alert('Pomodoro stopped'); return }
+      let work = 25*60 // seconds
+      const notify = () => { if('Notification' in window && Notification.permission === 'granted') new Notification('Pomodoro session finished — take a break!') }
+      pomoTimer = setInterval(()=>{
+        work--
+        if(work<=0){ clearInterval(pomoTimer); pomoTimer=null; notify(); alert('Pomodoro finished — take a 5 min break!') }
+      }, 1000)
+      alert('Pomodoro started for 25 minutes (you will get an alert when done)')
+    }
+
+    /* ---------------------------- reminders --------------------------- */
+    let scheduledReminders = {}
+    function scheduleReminderForTask(t){
+      // if task has date+time in future, schedule a reminder for 5 minutes before
+      if(!t.date || !t.time) return
+      const dt = new Date(t.date + 'T' + t.time)
+      const remindAt = new Date(dt.getTime() - 5*60*1000)
+      if(remindAt <= new Date()) return
+      const ms = remindAt.getTime() - Date.now()
+      const timeoutId = setTimeout(()=>{
+        if('Notification' in window && Notification.permission === 'granted'){
+          new Notification('Upcoming task: ' + t.title, {body: formatDate(t.date) + ' ' + (t.time||'')})
+        } else {
+          alert('Upcoming task: ' + t.title + '\n' + formatDate(t.date) + ' ' + (t.time||''))
+        }
+      }, ms)
+      scheduledReminders[t.id] = timeoutId
+    }
+    function scheduleAllReminders(){
+      // clear existing
+      Object.values(scheduledReminders).forEach(id=>clearTimeout(id))
+      scheduledReminders = {}
+      for(const t of tasks) scheduleReminderForTask(t)
+    }
+
+    /* ---------------------------- notifications permission helper --------------------------- */
+    (function attachNotifPermission(){
+      // clicking the notifStatus will ask for permission
+      $('notifStatus').addEventListener('click', async ()=>{
+        if(!('Notification' in window)){ alert('Notifications are not supported in this browser.'); return }
+        const p = await Notification.requestPermission()
+        $('notifStatus').textContent = p === 'granted' ? 'Granted' : p
+      })
+    })()
+
+    /* ---------------------------- init & run --------------------------- */
+    init()
+
+    // run schedule when page loads
+    window.addEventListener('load', scheduleAllReminders)
+
+    // utility: auto-save any edits periodically (not implemented: kept simple)
+  </script>
+</body>
+</html>
